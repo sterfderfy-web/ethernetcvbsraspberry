@@ -1,0 +1,20 @@
+[Unit]
+Description=CVBS camera RTSP server (MediaMTX)
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+User=cvbscam
+Group=cvbscam
+ExecStart=/usr/local/bin/mediamtx /etc/cvbs-camera/mediamtx.yml
+Restart=always
+RestartSec=3
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=Verified MS2107 weak CVBS RAM patch
+Wants=cvbs-capture.service
+After=cvbs-capture.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/cvbs-patch-run
+ExecStop=/usr/local/sbin/cvbs-patch-stop $MAINPID
+TimeoutStopSec=35
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

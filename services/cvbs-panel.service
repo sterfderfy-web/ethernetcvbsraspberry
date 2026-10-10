@@ -1,0 +1,15 @@
+[Unit]
+Description=CVBS image correction web panel
+After=network.target cvbs-capture.service
+[Service]
+ExecStart=/usr/bin/python3 /opt/cvbs-camera/panel.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/etc/cvbs-camera
+PrivateTmp=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+[Install]
+WantedBy=multi-user.target

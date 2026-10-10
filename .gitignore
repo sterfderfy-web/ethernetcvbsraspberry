@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+panel-password
+image.env
+settings.json
+*.log
+binaries/mediamtx-v1.21.1-arm64.tar.gz
+binaries/*.part

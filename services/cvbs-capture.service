@@ -1,0 +1,18 @@
+[Unit]
+Description=CVBS capture with persistent image correction
+Wants=cvbs-rtsp.service
+After=cvbs-rtsp.service
+StartLimitIntervalSec=0
+[Service]
+User=cvbscam
+Group=cvbscam
+SupplementaryGroups=video
+ExecStart=/usr/local/sbin/cvbs-capture-run
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target
