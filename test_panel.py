@@ -78,16 +78,14 @@ class PanelTests(unittest.TestCase):
         url = 'http://127.0.0.1:' + str(server.server_port)
         auth = 'Basic ' + base64.b64encode(b'admin:test-only-secret').decode()
         try:
-            with self.assertRaises(HTTPError) as error:
-                urlopen(url + '/api/settings')
-            self.assertEqual(error.exception.code, 401)
+            self.assertEqual(json.load(urlopen(url + '/api/settings')), panel.DEFAULT)
             request = Request(url + '/api/settings', headers={'Authorization': auth})
             self.assertEqual(json.load(urlopen(request)), panel.DEFAULT)
             body = json.dumps(dict(panel.DEFAULT, gamma=1.7)).encode()
             with self.assertRaises(HTTPError) as error:
                 urlopen(Request(url + '/api/settings', body, {'Authorization': auth}))
             self.assertEqual(error.exception.code, 403)
-            headers = {'Authorization': auth, 'X-CVBS-Control': '1', 'Content-Type': 'application/json'}
+            headers = {'X-CVBS-Control': '1', 'Content-Type': 'application/json'}
             with patch.object(panel.subprocess, 'run'):
                 result = json.load(urlopen(Request(url + '/api/settings', body, headers)))
                 self.assertEqual(result['gamma'], 1.7)

@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: curl -fL --retry 2 https://github.com/bluenviron/mediamtx/releases/download/v1.21.1/mediamtx_v1.21.1_linux_arm64.tar.gz -o binaries/mediamtx-v1.21.1-arm64.tar.gz
       - run: sha256sum -c SHA256SUMS
-      - run: bash -n install.sh capture.sh check.sh cvbs-patch-run cvbs-patch-stop
+      - run: bash -n update.sh install.sh capture.sh check.sh cvbs-patch-run cvbs-patch-stop
       - run: python3 -m unittest discover -s . -p 'test_*.py'
       - uses: actions/setup-go@v5
         with:

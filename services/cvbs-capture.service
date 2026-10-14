@@ -4,6 +4,7 @@ Wants=cvbs-rtsp.service
 After=cvbs-rtsp.service
 StartLimitIntervalSec=0
 [Service]
+RuntimeDirectory=cvbs-capture
 User=cvbscam
 Group=cvbscam
 SupplementaryGroups=video

@@ -6,7 +6,16 @@ body{margin:0;background:#10151d;color:#edf2f8;font:16px system-ui}main{max-widt
 </style><main><h1>CVBS камера · коррекция изображения</h1>
 <p>Протестированная карта захвата: MacroSilicon MS2106E. Настройки применяются ко всему RTSP-потоку и сохраняются после перезагрузки. При применении видео кратковременно прерывается.</p>
 <div class="grid"><section><img id="preview" alt="Нажмите «Обновить кадр»"><button id="refresh" class="secondary">Обновить кадр</button><p id="stream"></p><p>Это контрольный кадр. Для непрерывного видео откройте RTSP в пульте или VLC.</p></section>
-<section><form id="form"><div id="controls"></div><button id="apply" type="submit">Применить и сохранить</button><button id="balanced" type="button" class="secondary">Исходный профиль</button></form><p id="message" role="status"></p></section></div></main>
+<section><form id="form"><div id="controls"></div><button id="apply" type="submit">Применить и сохранить</button><button id="balanced" type="button" class="secondary">Исходный профиль</button></form><p id="message" role="status"></p></section></div>
+<section style="margin-top:24px"><h2>Диагностика и перезапуск захвата</h2>
+<p id="health" role="status">Загрузка состояния…</p>
+<button id="probe" class="secondary">Проверить изображение</button>
+<button id="restart">Перезапустить USB-плату захвата</button>
+<p id="diagnostic-message" role="status"></p>
+<p>USB-сброс временно прерывает видео, затем поток и RAM-патч запускаются заново. Это не отключение питания USB.</p>
+<pre id="stats" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+<details><summary>Журнал захвата и перезапуска</summary><pre id="logs" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>
+</section></main>
 <script>
 const specs={brightness:['Яркость захвата',0,255,1,60],contrast:['Контраст захвата',0,255,1,200],saturation:['Цветность захвата',0,255,1,160],lift:['Яркость изображения',-.3,.3,.01,0],gain:['Контраст изображения',.5,2.5,.01,1.05],color:['Насыщенность',0,3,.01,1.1],gamma:['Подъём теней (гамма)',.5,3,.01,1.3],gamma_weight:['Вес коррекции гаммы',0,1,.01,.6],denoise:['Шумоподавление',0,6,.1,1.2],sharpness:['Резкость',0,1.5,.05,.4]};
 const message=document.querySelector('#message'), controls=document.querySelector('#controls');
@@ -19,4 +28,20 @@ document.querySelector('#balanced').onclick=()=>{fill(Object.fromEntries(Object.
 document.querySelector('#form').onsubmit=async e=>{e.preventDefault();const button=document.querySelector('#apply');button.disabled=true;message.textContent='Применение…';try{const settings=Object.fromEntries(Object.keys(specs).map(k=>[k,Number(document.getElementById(k).value)]));await api('/api/settings',{method:'POST',headers:{'Content-Type':'application/json','X-CVBS-Control':'1'},body:JSON.stringify(settings)});message.textContent='Настройки сохранены.';await snapshot();}catch(e){message.textContent=e.message;}finally{button.disabled=false;}};
 document.querySelector('#stream').textContent='RTSP: rtsp://'+location.hostname+':554/live';
 api('/api/settings').then(r=>r.json()).then(s=>{fill(s);snapshot();}).catch(e=>message.textContent=e.message);
+const diag=document.querySelector('#diagnostic-message');
+async function status(){
+ try{
+  const s=await (await api('/api/status')).json();
+  const busy=s.services.reset.ActiveState==='activating';
+  document.querySelector('#restart').disabled=busy;
+  document.querySelector('#apply').disabled=busy;
+  document.querySelector('#health').textContent=(s.device_present?'USB-захват подключён. ':'USB-захват отсутствует. ')+(s.frames_arriving?'Поток выдаёт кадры. ':'Свежие кадры не подтверждены. ')+(busy?'Выполняется USB-сброс. ':('Результат последнего сброса: '+(s.services.reset.Result||'неизвестно')));
+  document.querySelector('#stats').textContent='Устройство: '+s.device+'\nКадры: '+(s.progress.frame||'—')+' · FPS: '+(s.progress.fps||'—')+' · Скорость: '+(s.progress.speed||'—')+'\nПропущено: '+(s.progress.drop_frames||'0')+' · Дублировано: '+(s.progress.dup_frames||'0')+'\nВозраст статистики: '+(s.progress_age_seconds??'—')+' с · Нагрузка: '+s.load_average.join(' / ')+'\n'+Object.entries(s.services).map(([k,v])=>k+': '+(v.ActiveState||'unknown')+' / '+(v.SubState||'—')+'; рестарты: '+(v.NRestarts||'0')).join('\n');
+  document.querySelector('#logs').textContent=s.logs;
+ }catch(e){document.querySelector('#health').textContent='Диагностика недоступна: '+e.message;}
+ finally{setTimeout(status,5000);}
+}
+document.querySelector('#probe').onclick=async()=>{const b=document.querySelector('#probe');b.disabled=true;diag.textContent='Проверка RTSP…';try{const s=await(await api('/api/probe')).json();diag.textContent=(s.image_received?'Изображение получено. ':'Не удалось получить изображение. ')+s.note+' '+s.detail;if(s.image_received)await snapshot();}catch(e){diag.textContent=e.message;}finally{b.disabled=false;}};
+document.querySelector('#restart').onclick=async()=>{const b=document.querySelector('#restart');b.disabled=true;try{await api('/api/restart',{method:'POST',headers:{'X-CVBS-Control':'1'}});diag.textContent='Запущен USB-сброс. Дождитесь завершения в статусе, затем проверьте изображение.';}catch(e){diag.textContent=e.message;b.disabled=false;}};
+status();
 </script></html>

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Local image control panel; no third party Python dependencies."""
-import base64
-import hmac
+import diagnostics
 import json
 import math
 import os
@@ -83,6 +82,12 @@ def apply_settings(s):
         raise
 
 
+def reset_busy():
+    state = subprocess.run(['systemctl', 'show', 'cvbs-reset', '--property=ActiveState', '--value'],
+                           check=True, capture_output=True, text=True, timeout=5)
+    return state.stdout.strip() in ('activating', 'active', 'deactivating')
+
+
 class Handler(BaseHTTPRequestHandler):
     def setup(self):
         super().setup()
@@ -99,24 +104,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def authorized(self):
-        secret = (ROOT / 'panel-password').read_text().strip()
-        expected = 'Basic ' + base64.b64encode(('admin:' + secret).encode()).decode()
-        if not hmac.compare_digest(self.headers.get('Authorization', '').encode('utf-8'), expected.encode('utf-8')):
-            self.send_response(401)
-            self.send_header('WWW-Authenticate', 'Basic realm="CVBS camera"')
-            self.send_header('Content-Length', '0')
-            self.end_headers()
-            return False
-        return True
-
     def do_GET(self):
-        if not self.authorized():
-            return
         path = self.path.split('?')[0]
         try:
             if path == '/':
                 self.reply(200, Path(__file__).with_name('index.html').read_bytes(), 'text/html')
+            elif path == '/api/status':
+                self.reply(200, json.dumps(diagnostics.status(ROOT)))
+            elif path == '/api/probe':
+                with LOCK:
+                    self.reply(200, json.dumps(diagnostics.probe()))
             elif path == '/api/settings':
                 with LOCK:
                     self.reply(200, json.dumps(read_settings()))
@@ -135,11 +132,21 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(503, json.dumps({'error': 'Кадр или настройки временно недоступны'}, ensure_ascii=False))
 
     def do_POST(self):
-        if not self.authorized():
-            return
         # Custom header disallows cross-origin forms; JSON fetch triggers a preflight.
         if self.headers.get('X-CVBS-Control') != '1':
             self.reply(403, '{}')
+            return
+        if self.path == '/api/restart':
+            try:
+                with LOCK:
+                    if reset_busy():
+                        self.reply(409, json.dumps({'error': 'USB reset already running'}))
+                        return
+                    subprocess.run(['systemctl', 'start', '--no-block', 'cvbs-reset'],
+                                   check=True, capture_output=True, timeout=5)
+                self.reply(202, json.dumps({'message': 'USB reset queued'}))
+            except (OSError, subprocess.SubprocessError):
+                self.reply(503, json.dumps({'error': 'Cannot start USB reset'}))
             return
         if self.path != '/api/settings':
             self.reply(404, '{}')
@@ -150,6 +157,9 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('Недопустимый размер запроса')
             settings = validate(json.loads(self.rfile.read(length)))
             with LOCK:
+                if reset_busy():
+                    self.reply(409, json.dumps({'error': 'USB reset running; retry settings later'}))
+                    return
                 apply_settings(settings)
             self.reply(200, json.dumps(settings))
         except (ValueError, UnicodeError) as error:

@@ -1,0 +1,7 @@
+[Unit]
+Description=Reset configured CVBS USB capture and restore streaming
+After=cvbs-rtsp.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/cvbs-camera/reset-capture.py
+TimeoutStartSec=180

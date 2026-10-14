@@ -72,24 +72,24 @@ usermod -a -G video cvbscam
 install -d -m 755 /etc/cvbs-camera /opt/cvbs-camera
 cp mediamtx.yml /etc/cvbs-camera/mediamtx.yml
 install -m 755 capture.sh /usr/local/sbin/cvbs-capture-run
+if [[ ! -s /etc/cvbs-camera/device.env ]]; then
 printf 'CVBS_DEVICE=/dev/v4l/by-id/usb-MACROSILICON_AV_TO_USB2.0_%s-video-index0\n' "$SERIAL" > /etc/cvbs-camera/device.env
-install -m 644 panel.py index.html /opt/cvbs-camera/
+fi
+install -m 644 panel.py diagnostics.py reset-capture.py progress.py index.html /opt/cvbs-camera/
 python3 seed-settings.py
 chmod 644 /etc/cvbs-camera/image.env /etc/cvbs-camera/settings.json
-if [[ ! -s /etc/cvbs-camera/panel-password ]]; then
-    python3 -c 'import secrets; print(secrets.token_urlsafe(18))' > /etc/cvbs-camera/panel-password
-fi
-chmod 600 /etc/cvbs-camera/panel-password
 # Replace only our historical correction override. Other overrides are left in the backup and in place.
 rm -f /etc/systemd/system/cvbs-capture.service.d/20-image-correction.conf
 cp services/*.service /etc/systemd/system/
-sed "s/20200909/$SERIAL/g" 70-cvbs-hid.rules > /etc/udev/rules.d/70-cvbs-hid.rules
+if [[ ! -s /etc/udev/rules.d/70-cvbs-hid.rules ]]; then
+    sed "s/20200909/$SERIAL/g" 70-cvbs-hid.rules > /etc/udev/rules.d/70-cvbs-hid.rules
+fi
 install -d /var/lib/cvbs-patch
 install -m 755 cvbs-patch-run cvbs-patch-stop /usr/local/sbin/
 udevadm control --reload-rules
 udevadm trigger --subsystem-match=hidraw
 udevadm settle
-systemd-analyze verify /etc/systemd/system/cvbs-{rtsp,capture,weak-video,panel}.service
+systemd-analyze verify /etc/systemd/system/cvbs-{rtsp,capture,weak-video,panel,reset}.service
 systemctl daemon-reload
 systemctl enable --now cvbs-rtsp cvbs-capture cvbs-weak-video cvbs-panel
 if (( ! KEEP_RADIOS )); then
@@ -99,9 +99,7 @@ if (( ! KEEP_RADIOS )); then
     systemctl mask bluetooth.service hciuart.service
 fi
 echo "Backup: $backup"
-echo "Panel: http://${IP%/*}:8080 (admin)"
-echo 'Panel password (save it):'
-cat /etc/cvbs-camera/panel-password
+echo "Panel: http://${IP%/*}:8080 (no password)"
 echo "RTSP: rtsp://${IP%/*}:554/live"
 echo 'Hardware validation: sudo bash /opt/cvbs-camera/check.sh'
 install -m 755 check.sh /opt/cvbs-camera/check.sh
