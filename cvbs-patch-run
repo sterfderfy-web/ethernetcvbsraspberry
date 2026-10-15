@@ -2,10 +2,22 @@
 set -euo pipefail
 exec 9>/run/cvbs-patch.lock
 flock -n 9
-test -c /dev/cvbs-hid
-# The udev identity selects exactly VID/PID 534d:0021 and serial 20200909.
+# Wait for capture selection, then match its physical USB parent, not its serial.
+for attempt in $(seq 1 10); do
+    [[ -s /run/cvbs-capture/selection.json ]] && break
+    sleep 1
+done
+hid=$(/usr/bin/python3 /opt/cvbs-camera/capture_auto.py --patch-hid) || exit 78
 # The worker independently checks the full original firmware SHA256 before writes.
 rm -f /run/cvbs-patch.stop
 run_dir="/var/lib/cvbs-patch/$(date +%s%N)"
 printf '%s\n' "$run_dir" > /var/lib/cvbs-patch/current-run
-exec /usr/local/bin/ms-tools-arm64 --raw-path=/dev/cvbs-hid --vid=534d --pid=0021 --no-patch --eeprom-size=2048 --log-level=1 trial-loopfix "$run_dir" --decoder-unmute --firmware-hold --live --seconds=28800 --stop-file=/run/cvbs-patch.stop
+set +e
+/usr/local/bin/ms-tools-arm64 --raw-path="$hid" --vid=534d --pid=0021 --no-patch --eeprom-size=2048 --log-level=1 trial-loopfix "$run_dir" --decoder-unmute --firmware-hold --live --seconds=28800 --stop-file=/run/cvbs-patch.stop 2>&1 | tee /run/cvbs-patch-error
+result=${PIPESTATUS[0]}
+set -e
+if grep -q 'unknown running firmware' /run/cvbs-patch-error; then
+    echo 'Firmware incompatible with RAM patch; standard video capture remains available'
+    exit 78
+fi
+exit "$result"

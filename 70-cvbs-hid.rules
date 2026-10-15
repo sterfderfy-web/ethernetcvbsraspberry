@@ -1,1 +1,1 @@
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="534d", ATTRS{idProduct}=="0021", ATTRS{serial}=="20200909", SYMLINK+="cvbs-hid"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="534d", ATTRS{idProduct}=="0021", SYMLINK+="cvbs-hid"

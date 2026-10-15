@@ -39,8 +39,14 @@ def status(root):
         device = (root / 'device.env').read_text().strip().split('CVBS_DEVICE=', 1)[1].splitlines()[0]
     except (OSError, IndexError):
         pass
+    selection = {}
+    try:
+        selection = json.loads(Path('/run/cvbs-capture/selection.json').read_text())
+        device = selection.get('device') or device
+    except (OSError, ValueError):
+        pass
     return dict(services=services, device=device, device_present=bool(device and Path(device).exists()),
-                progress=progress, progress_age_seconds=round(age, 1) if age is not None else None,
+                selection=selection, progress=progress, progress_age_seconds=round(age, 1) if age is not None else None,
                 frames_arriving=age is not None and age < 5 and int(progress.get('frame', '0')) > 0 and services['capture'].get('ActiveState') == 'active',
                 load_average=Path('/proc/loadavg').read_text().split()[:3],
                 logs=command(['journalctl', '-u', 'cvbs-capture', '-u', 'cvbs-weak-video',

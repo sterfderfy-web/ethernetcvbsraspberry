@@ -4,7 +4,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 PACKAGE=$PWD
 IP=${CVBS_IP:-192.168.144.21/24}
 IFACE=${CVBS_INTERFACE:-eth0}
-SERIAL=${CVBS_SERIAL:-20200909}
 KEEP_NETWORK=0
 KEEP_RADIOS=0
 for arg in "$@"; do
@@ -18,7 +17,7 @@ done
 [[ $(uname -m) == aarch64 ]] || { echo 'Requires Linux ARM64 / 64-bit Raspberry Pi OS'; exit 1; }
 command -v apt-get >/dev/null || { echo 'Requires Debian/Raspberry Pi OS with apt'; exit 1; }
 [[ -d /run/systemd/system ]] || { echo 'Requires systemd'; exit 1; }
-[[ $IFACE =~ ^[a-zA-Z0-9_-]+$ && $SERIAL =~ ^[a-zA-Z0-9_-]+$ ]] || exit 2
+[[ $IFACE =~ ^[a-zA-Z0-9_-]+$ ]] || exit 2
 BOOT=/boot/firmware/config.txt
 if (( ! KEEP_RADIOS )); then
     [[ -f $BOOT ]] || { echo 'Raspberry boot config missing; use --keep-radios for another ARM64 board'; exit 1; }
@@ -72,18 +71,17 @@ usermod -a -G video cvbscam
 install -d -m 755 /etc/cvbs-camera /opt/cvbs-camera
 cp mediamtx.yml /etc/cvbs-camera/mediamtx.yml
 install -m 755 capture.sh /usr/local/sbin/cvbs-capture-run
-if [[ ! -s /etc/cvbs-camera/device.env ]]; then
-printf 'CVBS_DEVICE=/dev/v4l/by-id/usb-MACROSILICON_AV_TO_USB2.0_%s-video-index0\n' "$SERIAL" > /etc/cvbs-camera/device.env
+# Migrate historical serial-bound device paths to automatic USB discovery.
+if [[ ! -s /etc/cvbs-camera/device.env ]] || grep -q 'usb-MACROSILICON_AV_TO_USB2.0_\|/dev/cvbs-video' /etc/cvbs-camera/device.env; then
+    printf 'CVBS_DEVICE=auto\n' > /etc/cvbs-camera/device.env
 fi
-install -m 644 panel.py diagnostics.py reset-capture.py progress.py index.html /opt/cvbs-camera/
+install -m 644 panel.py diagnostics.py reset-capture.py progress.py capture_auto.py index.html /opt/cvbs-camera/
 python3 seed-settings.py
 chmod 644 /etc/cvbs-camera/image.env /etc/cvbs-camera/settings.json
 # Replace only our historical correction override. Other overrides are left in the backup and in place.
 rm -f /etc/systemd/system/cvbs-capture.service.d/20-image-correction.conf
 cp services/*.service /etc/systemd/system/
-if [[ ! -s /etc/udev/rules.d/70-cvbs-hid.rules ]]; then
-    sed "s/20200909/$SERIAL/g" 70-cvbs-hid.rules > /etc/udev/rules.d/70-cvbs-hid.rules
-fi
+install -m 644 70-cvbs-hid.rules /etc/udev/rules.d/70-cvbs-hid.rules
 install -d /var/lib/cvbs-patch
 install -m 755 cvbs-patch-run cvbs-patch-stop /usr/local/sbin/
 udevadm control --reload-rules

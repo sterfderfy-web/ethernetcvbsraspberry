@@ -7,9 +7,11 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 ExecStart=/usr/local/sbin/cvbs-patch-run
-ExecStop=/usr/local/sbin/cvbs-patch-stop $MAINPID
+ExecStop=/usr/local/sbin/cvbs-patch-stop
 TimeoutStopSec=35
 Restart=always
+RestartPreventExitStatus=78
+SuccessExitStatus=78
 RestartSec=5
 
 [Install]

@@ -4,7 +4,7 @@
 <style>
 body{margin:0;background:#10151d;color:#edf2f8;font:16px system-ui}main{max-width:1100px;margin:auto;padding:24px}h1{font-size:26px}p{color:#aab9ca;line-height:1.5}.grid{display:grid;grid-template-columns:1.2fr 1fr;gap:24px}section{background:#1b2431;padding:20px;border-radius:14px}img{width:100%;background:#080c12;aspect-ratio:3/2;object-fit:contain}label{display:grid;grid-template-columns:1fr 70px;gap:6px;margin:14px 0}input{grid-column:1/-1;width:100%;accent-color:#48bfa4}output{text-align:right;color:#6ee2c7}button{background:#48bfa4;border:0;padding:12px 16px;border-radius:8px;font:inherit;cursor:pointer;margin:5px}button:disabled{opacity:.5;cursor:wait}.secondary{background:#354456;color:white}#message{min-height:2em;color:#83dcc4}@media(max-width:760px){.grid{grid-template-columns:1fr}}
 </style><main><h1>CVBS камера · коррекция изображения</h1>
-<p>Протестированная карта захвата: MacroSilicon MS2106E. Настройки применяются ко всему RTSP-потоку и сохраняются после перезагрузки. При применении видео кратковременно прерывается.</p>
+<p>USB-захват и режим видео выбираются автоматически. Настройки применяются ко всему RTSP-потоку и сохраняются после перезагрузки. Недоступные аппаратные регуляторы отключены; программная коррекция работает независимо от них. При применении видео кратковременно прерывается.</p>
 <div class="grid"><section><img id="preview" alt="Нажмите «Обновить кадр»"><button id="refresh" class="secondary">Обновить кадр</button><p id="stream"></p><p>Это контрольный кадр. Для непрерывного видео откройте RTSP в пульте или VLC.</p></section>
 <section><form id="form"><div id="controls"></div><button id="apply" type="submit">Применить и сохранить</button><button id="balanced" type="button" class="secondary">Исходный профиль</button></form><p id="message" role="status"></p></section></div>
 <section style="margin-top:24px"><h2>Диагностика и перезапуск захвата</h2>
@@ -38,6 +38,12 @@ async function status(){
   document.querySelector('#health').textContent=(s.device_present?'USB-захват подключён. ':'USB-захват отсутствует. ')+(s.frames_arriving?'Поток выдаёт кадры. ':'Свежие кадры не подтверждены. ')+(busy?'Выполняется USB-сброс. ':('Результат последнего сброса: '+(s.services.reset.Result||'неизвестно')));
   document.querySelector('#stats').textContent='Устройство: '+s.device+'\nКадры: '+(s.progress.frame||'—')+' · FPS: '+(s.progress.fps||'—')+' · Скорость: '+(s.progress.speed||'—')+'\nПропущено: '+(s.progress.drop_frames||'0')+' · Дублировано: '+(s.progress.dup_frames||'0')+'\nВозраст статистики: '+(s.progress_age_seconds??'—')+' с · Нагрузка: '+s.load_average.join(' / ')+'\n'+Object.entries(s.services).map(([k,v])=>k+': '+(v.ActiveState||'unknown')+' / '+(v.SubState||'—')+'; рестарты: '+(v.NRestarts||'0')).join('\n');
   document.querySelector('#logs').textContent=s.logs;
+  if(s.selection){
+   document.querySelector('#stats').textContent+='\nРежим: '+JSON.stringify(s.selection.mode||'по умолчанию')+' · Попытка: '+(s.selection.attempt||0)+'\n'+(s.selection.error||'');
+   const c=s.selection.controls||{};
+   document.querySelector('#stats').textContent+='\nАппаратные настройки: '+JSON.stringify(c.applied||{})+'\nНедоступные регуляторы: '+(c.skipped||[]).join(', ')+(c.error?' · '+c.error:'');
+   for(const key of ['brightness','contrast','saturation']){document.getElementById(key).disabled=Boolean(c.error)||(c.skipped||[]).includes(key);}
+  }
  }catch(e){document.querySelector('#health').textContent='Диагностика недоступна: '+e.message;}
  finally{setTimeout(status,5000);}
 }

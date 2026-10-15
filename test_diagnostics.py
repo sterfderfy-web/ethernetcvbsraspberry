@@ -72,7 +72,8 @@ class DiagnosticTests(unittest.TestCase):
             reset = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(reset)
         with patch.object(reset, 'usb_device', return_value=Path('/dev/bus/usb/001/002')), \
-             patch.object(Path, 'read_text', side_effect=['CVBS_DEVICE=/dev/video0', '/tmp/patch', 'restoration failures: [error]']), \
+             patch.object(reset, 'selected_device', return_value='/dev/video0'), \
+             patch.object(Path, 'read_text', side_effect=['/tmp/patch', 'restoration failures: [error]']), \
              patch.object(reset, 'run') as run, \
              patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)):
             with self.assertRaisesRegex(RuntimeError, 'rollback not verified'):
@@ -90,9 +91,9 @@ class DiagnosticTests(unittest.TestCase):
             usb = Path(folder) / 'usb'
             usb.touch()
             with patch.object(reset, 'usb_device', return_value=usb), \
-                 patch.object(Path, 'read_text', return_value='CVBS_DEVICE=/dev/video0'), \
+                 patch.object(reset, 'selected_device', return_value='/dev/video0'), \
                  patch.object(reset, 'run') as run, \
-                 patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 3)):
+                 patch.object(subprocess, 'run', side_effect=[subprocess.CompletedProcess([], 3), subprocess.CompletedProcess([], 0)]):
                 with self.assertRaisesRegex(OSError, 'USB error'):
                     reset.main()
                 self.assertEqual([call.args for call in run.call_args_list][-2:],
